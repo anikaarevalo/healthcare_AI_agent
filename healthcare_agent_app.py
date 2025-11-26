@@ -13,12 +13,13 @@ Features:
 
 import os
 import streamlit as st
-from typing import List
+from typing import List, Optional
 from haystack.components.generators.chat import OpenAIChatGenerator
 from haystack.components.agents import Agent
 from haystack.components.websearch import SerperDevWebSearch
 from haystack.dataclasses import ChatMessage, Document
 from haystack.tools import ComponentTool
+from haystack.utils import Secret
 
 
 # ============================================================================
@@ -49,29 +50,9 @@ def initialize_session_state():
 # API KEY MANAGEMENT
 # ============================================================================
 
-def validate_api_keys(openai_key: str, serper_key: str) -> tuple[bool, str]:
-    """
-    Validate API keys before setting them.
-    
-    Args:
-        openai_key: OpenAI API key
-        serper_key: SerperDev API key
-    
-    Returns:
-        tuple: (is_valid, error_message)
-    """
-    if not openai_key or not openai_key.strip():
-        return False, "OpenAI API key is required"
-    if not serper_key or not serper_key.strip():
-        return False, "SerperDev API key is required"
-    if not openai_key.startswith("sk-"):
-        return False, "OpenAI API key should start with 'sk-'"
-    return True, ""
-
-
 def set_api_keys(openai_key: str, serper_key: str) -> bool:
     """
-    Set API keys as environment variables after validation.
+    Set API keys as environment variables.
     
     Args:
         openai_key: OpenAI API key
@@ -81,14 +62,11 @@ def set_api_keys(openai_key: str, serper_key: str) -> bool:
         bool: True if keys were set successfully
     """
     try:
-        is_valid, error_msg = validate_api_keys(openai_key, serper_key)
-        if not is_valid:
-            st.error(f"❌ {error_msg}")
-            return False
-            
-        os.environ['OPENAI_API_KEY'] = openai_key.strip()
-        os.environ['SERPERDEV_API_KEY'] = serper_key.strip()
-        return True
+        if openai_key and serper_key:
+            os.environ['OPENAI_API_KEY'] = openai_key
+            os.environ['SERPERDEV_API_KEY'] = serper_key
+            return True
+        return False
     except Exception as e:
         st.error(f"Error setting API keys: {e}")
         return False
@@ -103,32 +81,28 @@ def render_api_key_sidebar():
         openai_key = st.text_input(
             "OpenAI API Key",
             type="password",
-            help="Get your key from https://platform.openai.com/api-keys",
-            key="openai_input"
+            help="Get your key from https://platform.openai.com/api-keys"
         )
         
         serper_key = st.text_input(
             "SerperDev API Key",
             type="password",
-            help="Get your key from https://serper.dev/",
-            key="serper_input"
+            help="Get your key from https://serper.dev/"
         )
         
-        if st.button("Set API Keys", type="primary", key="set_keys_btn"):
+        if st.button("Set API Keys", type="primary"):
             if set_api_keys(openai_key, serper_key):
                 st.session_state.api_keys_set = True
                 st.success("✅ API keys set successfully!")
                 st.rerun()
+            else:
+                st.error("❌ Please provide both API keys")
         
         if st.session_state.api_keys_set:
             st.success("🟢 API Keys Active")
-            if st.button("Clear Keys", key="clear_keys_btn"):
+            if st.button("Clear Keys"):
                 st.session_state.api_keys_set = False
                 st.session_state.agent = None
-                st.session_state.messages = []
-                # Clear environment variables
-                os.environ.pop('OPENAI_API_KEY', None)
-                os.environ.pop('SERPERDEV_API_KEY', None)
                 st.rerun()
 
 
@@ -146,14 +120,11 @@ def documents_to_string(documents: List[Document]) -> str:
     Returns:
         str: Formatted string containing document content and links
     """
-    if not documents:
-        return "No documents found."
-    
     result_str = ""
-    for idx, document in enumerate(documents, 1):
+    for document in documents:
         link = document.meta.get('link', 'No link available')
-        content = document.content or "No content available"
-        result_str += f"[{idx}] {link}\n{content}\n\n"
+        content = document.content
+        result_str += f"Content from {link}:\n{content}\n\n"
     return result_str
 
 
@@ -164,18 +135,14 @@ def create_web_search_tool() -> ComponentTool:
     Returns:
         ComponentTool: Configured web search tool for the agent
     """
-    try:
-        search_tool = ComponentTool(
-            component=SerperDevWebSearch(top_k=5),
-            name="web_search_tool",
-            description="Search the web for current medical and healthcare information",
-            outputs_to_string={"source": "documents", "handler": documents_to_string},
-            outputs_to_state={"documents": {"source": "documents"}}
-        )
-        return search_tool
-    except Exception as e:
-        st.error(f"Error creating search tool: {e}")
-        raise
+    search_tool = ComponentTool(
+        component=SerperDevWebSearch(top_k=5),
+        name="web_search_tool",
+        description="Search the web for current medical and healthcare information",
+        outputs_to_string={"source": "documents", "handler": documents_to_string},
+        outputs_to_state={"documents": {"source": "documents"}}
+    )
+    return search_tool
 
 
 # ============================================================================
@@ -195,35 +162,29 @@ def create_healthcare_agent() -> Agent:
     Your role is to:
     - Provide accurate, evidence-based medical information
     - Search the web for the latest healthcare research and guidelines
-    - Keep responses concise (no more than 2-3 paragraphs), clear, and medically appropriate
+    - Keep responses concise, clear, and medically appropriate
     - Always cite sources when providing medical information
     - Remind users to consult healthcare professionals for personal medical advice
     
     Important disclaimers:
     - You are not a replacement for professional medical advice
     - Encourage users to consult with qualified healthcare providers
-    - For emergencies, direct users to call emergency services immediately
-    
-    Format your responses clearly with proper paragraphs and cite your sources.
+    - For emergencies, direct users to call emergency services
     """
     
-    try:
-        # Create the search tool
-        search_tool = create_web_search_tool()
-        
-        # Create the agent
-        agent = Agent(
-            chat_generator=OpenAIChatGenerator(model="gpt-4o-mini"),
-            system_prompt=system_prompt,
-            tools=[search_tool],
-            state_schema={"documents": {"type": list[Document]}},
-            streaming_callback=None  # We'll handle streaming in Streamlit
-        )
-        
-        return agent
-    except Exception as e:
-        st.error(f"Error creating agent: {e}")
-        raise
+    # Create the search tool
+    search_tool = create_web_search_tool()
+    
+    # Create the agent
+    agent = Agent(
+        chat_generator=OpenAIChatGenerator(model="gpt-4o-mini"),
+        system_prompt=system_prompt,
+        tools=[search_tool],
+        state_schema={"documents": {"type": list[Document]}},
+        streaming_callback=None  # We'll handle streaming in Streamlit
+    )
+    
+    return agent
 
 
 # ============================================================================
@@ -260,12 +221,8 @@ def process_user_query(user_input: str) -> str:
         str: Agent's response
     """
     try:
-        # Validate input
-        if not user_input or not user_input.strip():
-            return "Please enter a valid question."
-        
         # Create chat message
-        chat_message = ChatMessage.from_user(user_input.strip())
+        chat_message = ChatMessage.from_user(user_input)
         
         # Run the agent
         with st.spinner("🔍 Searching and analyzing..."):
@@ -275,26 +232,16 @@ def process_user_query(user_input: str) -> str:
         if result and "messages" in result:
             assistant_messages = [
                 msg for msg in result["messages"] 
-                if hasattr(msg, 'role') and msg.role.value == "assistant"
+                if msg.role.value == "assistant"
             ]
             if assistant_messages:
-                response_text = assistant_messages[-1].text
-                if response_text:
-                    return response_text
+                return assistant_messages[-1].text
         
-        return "I apologize, but I couldn't generate a response. Please try rephrasing your question."
+        return "I apologize, but I couldn't generate a response. Please try again."
     
     except Exception as e:
-        error_msg = str(e)
-        st.error(f"Error processing query: {error_msg}")
-        
-        # Provide helpful error messages
-        if "api key" in error_msg.lower():
-            return "There was an issue with your API keys. Please check that they are valid and try again."
-        elif "rate limit" in error_msg.lower():
-            return "Rate limit exceeded. Please wait a moment and try again."
-        else:
-            return f"An error occurred while processing your request. Error: {error_msg}"
+        st.error(f"Error processing query: {e}")
+        return "An error occurred while processing your request. Please check your API keys and try again."
 
 
 def render_chat_interface():
@@ -306,15 +253,15 @@ def render_chat_interface():
     )
     
     # Display disclaimer
-    with st.expander("⚠️ Important Medical Disclaimer", expanded=False):
+    with st.expander("⚠️ Important Medical Disclaimer"):
         st.warning(
             """
-            **This AI assistant provides general health information for educational purposes only.**
+            This AI assistant provides general health information for educational purposes only.
+            It is NOT a substitute for professional medical advice, diagnosis, or treatment.
             
-            - ❌ NOT a substitute for professional medical advice, diagnosis, or treatment
-            - ✅ Always consult qualified healthcare professionals for medical concerns
-            - 🚨 In case of emergency, call your local emergency services immediately
-            - ⏰ Do not delay seeking medical advice based on information from this assistant
+            - Always consult qualified healthcare professionals for medical concerns
+            - In case of emergency, call your local emergency services immediately
+            - Do not delay seeking medical advice based on information from this assistant
             """
         )
     
@@ -322,9 +269,7 @@ def render_chat_interface():
     display_chat_history()
     
     # Chat input
-    user_input = st.chat_input("Ask a healthcare question...", key="chat_input")
-    
-    if user_input:
+    if user_input := st.chat_input("Ask a healthcare question..."):
         # Add user message to history and display
         st.session_state.messages.append({"role": "user", "content": user_input})
         render_chat_message("user", user_input)
@@ -360,7 +305,6 @@ def render_sidebar_info():
         - How is diabetes diagnosed?
         - What are the latest treatments for migraines?
         - Explain the benefits of a Mediterranean diet
-        - What are common side effects of statins?
         """)
         
         st.markdown("---")
@@ -373,7 +317,7 @@ def render_sidebar_info():
         """)
         
         # Clear chat button
-        if st.button("🗑️ Clear Chat History", use_container_width=True, key="clear_chat_btn"):
+        if st.button("🗑️ Clear Chat History", use_container_width=True):
             st.session_state.messages = []
             st.rerun()
 
@@ -384,60 +328,38 @@ def render_sidebar_info():
 
 def main():
     """Main application entry point."""
-    try:
-        # Setup
-        setup_page_config()
-        initialize_session_state()
+    # Setup
+    setup_page_config()
+    initialize_session_state()
+    
+    # Render API key input
+    render_api_key_sidebar()
+    
+    # Check if API keys are set
+    if not st.session_state.api_keys_set:
+        st.info("👈 Please enter your API keys in the sidebar to get started.")
+        st.markdown("""
+        ### Getting Started
         
-        # Render API key input
-        render_api_key_sidebar()
+        This application requires two API keys:
         
-        # Check if API keys are set
-        if not st.session_state.api_keys_set:
-            st.info("👈 Please enter your API keys in the sidebar to get started.")
-            st.markdown("""
-            ### Getting Started
-            
-            This application requires two API keys:
-            
-            1. **OpenAI API Key**: Get yours at [platform.openai.com](https://platform.openai.com/api-keys)
-               - Should start with `sk-`
-               - Requires credits/subscription
-            
-            2. **SerperDev API Key**: Get yours at [serper.dev](https://serper.dev/)
-               - Free tier available (2,500 queries/month)
-               - Sign up with Google account
-            
-            Once you've entered your keys, you can start asking healthcare questions!
-            
-            ---
-            
-            ### Privacy Notice
-            - Your API keys are only stored in your current session
-            - Keys are never saved to disk or transmitted to third parties
-            - Clear your keys using the "Clear Keys" button when done
-            """)
-            return
+        1. **OpenAI API Key**: Get yours at [platform.openai.com](https://platform.openai.com/api-keys)
+        2. **SerperDev API Key**: Get yours at [serper.dev](https://serper.dev/)
         
-        # Initialize agent if not already done
-        if st.session_state.agent is None:
-            try:
-                with st.spinner("Initializing healthcare agent..."):
-                    st.session_state.agent = create_healthcare_agent()
-            except Exception as e:
-                st.error(f"Failed to initialize agent: {e}")
-                st.session_state.api_keys_set = False
-                return
-        
-        # Render sidebar info
-        render_sidebar_info()
-        
-        # Render main chat interface
-        render_chat_interface()
-        
-    except Exception as e:
-        st.error(f"Application error: {e}")
-        st.info("Please refresh the page and try again.")
+        Once you've entered your keys, you can start asking healthcare questions!
+        """)
+        return
+    
+    # Initialize agent if not already done
+    if st.session_state.agent is None:
+        with st.spinner("Initializing healthcare agent..."):
+            st.session_state.agent = create_healthcare_agent()
+    
+    # Render sidebar info
+    render_sidebar_info()
+    
+    # Render main chat interface
+    render_chat_interface()
 
 
 # ============================================================================
