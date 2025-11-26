@@ -1,4 +1,4 @@
-streamlit==1.39.0
-haystack-ai==2.7.0
-serperdev==2.0.0
-openai==1.54.0
+streamlit
+haystack-ai
+serperdev
+openai
