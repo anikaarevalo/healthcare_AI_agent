@@ -1,6 +1,6 @@
 ## About the Healthcare AI Agent
 
-I constructed a healthcare AI agent capable of searching the web using **Haystack**, an open-source (modular, model-agnostic) orchestration framework for LLM-based applications. This project is inspired by DataCamp’s “Building AI Agents with Haystack” interactive course.
+I constructed a healthcare AI agent capable of searching the web using [Haystack](https://haystack.deepset.ai/), an open-source (modular, model-agnostic) orchestration framework for LLM-based applications. This project is inspired by DataCamp’s ["Building AI Agents with Haystack"](https://app.datacamp.com/learn/courses/building-ai-agents-with-haystack) interactive course.
 
 My goal in this project is to prototype my own **tool-using AI agent** that is capable of interpreting natural language queries, make autonomous (accurate and appropriate) decisions, and act on them using the right tools at the right time.
 
@@ -10,7 +10,7 @@ This app is a **minimum viable product (MVP)** reflecting key agentic design pri
 
 ## App Deployment via Streamlit
 
-OpenAI’s **ChatGPT-5** transformed my source code into a production-ready Streamlit application to be deployed on Streamlit cloud.
+OpenAI’s [ChatGPT-5](https://chatgpt.com/) transformed my source code into a production-ready Streamlit application to be deployed on [Streamlit cloud](https://share.streamlit.io/).
 
 Here are the key transformations implemented:
 
@@ -34,7 +34,7 @@ Here are the key transformations implemented:
 
 ## Usage of the App
 
-1.  Go to [https://healthcareaiagentbyanika.streamlit.app/](https://healthcareaiagentbyanika.streamlit.app/) to access the Healthcare AI Agent app.
+1.  To access the Healthcare AI Agent app click [here](https://healthcareaiagentbyanika.streamlit.app).
 2.  Start asking healthcare questions.
 3.  The agent will search the web and provide evidence-based responses.
 
@@ -43,11 +43,11 @@ Here are the key transformations implemented:
 ## Visuals
 
 ### web version
-<img width="650" alt="pipeline 2022-04-21 at 15 49 28" src="">
+<img width="650" alt="pipeline 2022-04-21 at 15 49 28" src="https://github.com/anikaarevalo/healthcare_AI_agent/blob/40c856dc9f4d1db89c2bb94b58da5742228a8c59/assets/web_healthcare_agent.png">
 
 
 ### mobile version
-<img width="650" alt="pipeline 2022-04-21 at 15 49 28" src="">
+<img width="250" alt="pipeline 2022-04-21 at 15 49 28" src="https://github.com/anikaarevalo/healthcare_AI_agent/blob/40c856dc9f4d1db89c2bb94b58da5742228a8c59/assets/mobile_healthcare_agent.jpeg">
 
 
 ---
