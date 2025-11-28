@@ -4,7 +4,7 @@ Capable of navigating the the web in real time, I constructed a healthcare AI ag
 
 My goal in this project is to prototype my own **tool-using AI agent** that is capable of interpreting natural language queries, make autonomous (accurate and appropriate) decisions, and act on them using the right tools at the right time.
 
-This app is a **minimum viable product (MVP)** reflecting key agentic design principles and integration of components (Agent, Chat Generator, and Tool class) into an intelligent system.
+This app is a **minimum viable product (MVP)** reflecting key agentic design principles and integration of components (Agent, Chat Generator, and Tool class) into an intelligent system as reusable pipelines.
 
 ---
 
@@ -60,5 +60,5 @@ To make my app production-grade, testing is required across multiple dimensions:
     * Persistent chat history across sessions
     * Conversation export
     * Real OpenAI token with streaming callbacks
-2.  Building reusable **Haystack pipelines** with a second, complementary core functionality: querying structured personal (patient) data from a private database.
-3.  Serving the MCP tool for MCP servers.
+2.  Building more reusable **Haystack pipelines** by implementing a second, complementary core functionality: querying structured personal (patient) data from a private database.
+3.  Enabling access to project functionality via MCP tooling (i.e., serving as MCP tool to MCP servers). 
