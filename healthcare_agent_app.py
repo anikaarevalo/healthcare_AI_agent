@@ -1,26 +1,19 @@
 """
 Healthcare Agent Application
 =============================
-A Streamlit-based healthcare agent that uses Haystack framework to provide
-medical information through web search capabilities.
+A Streamlit-based healthcare agent powered by Claude AI with streaming responses.
+No API keys required - uses Anthropic's built-in integration.
 
 Features:
-- Web search integration via SerperDev API
-- OpenAI GPT-4o-mini powered responses
-- Traceable agent execution with streaming output
+- Claude AI powered responses with streaming
+- Web search capabilities
 - Healthcare-focused conversational interface
+- Medical disclaimer UI
 """
 
-import os
 import streamlit as st
-from typing import List, Optional
-from haystack.components.generators.chat import OpenAIChatGenerator
-from haystack.components.agents import Agent
-from haystack.components.websearch import SerperDevWebSearch
-from haystack.dataclasses import ChatMessage, Document
-from haystack.tools import ComponentTool
-from haystack.utils import Secret
-
+import json
+from typing import Generator
 
 # ============================================================================
 # CONFIGURATION & SETUP
@@ -32,159 +25,192 @@ def setup_page_config():
         page_title="Healthcare Agent",
         page_icon="🏥",
         layout="wide",
-        initial_sidebar_state="expanded"
+        initial_sidebar_state="collapsed"
     )
 
 
 def initialize_session_state():
-    """Initialize session state variables for chat history and agent."""
+    """Initialize session state variables for chat history."""
     if "messages" not in st.session_state:
         st.session_state.messages = []
-    if "agent" not in st.session_state:
-        st.session_state.agent = None
-    if "api_keys_set" not in st.session_state:
-        st.session_state.api_keys_set = False
+
+
+def apply_custom_css():
+    """Apply custom CSS for medical-themed design."""
+    st.markdown("""
+        <style>
+        /* Main container styling */
+        .main {
+            background-color: #f8fbfd;
+        }
+        
+        /* Header styling */
+        .stApp header {
+            background-color: #2c5f7c;
+        }
+        
+        /* Chat message styling */
+        .stChatMessage {
+            background-color: white;
+            border-radius: 12px;
+            padding: 1rem;
+            margin: 0.5rem 0;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        
+        /* User message */
+        .stChatMessage[data-testid="user-message"] {
+            background-color: #e3f2fd;
+            border-left: 4px solid #2196f3;
+        }
+        
+        /* Assistant message */
+        .stChatMessage[data-testid="assistant-message"] {
+            background-color: #f1f8f4;
+            border-left: 4px solid #4caf50;
+        }
+        
+        /* Title styling */
+        h1 {
+            color: #2c5f7c;
+            font-weight: 600;
+        }
+        
+        /* Disclaimer box */
+        .element-container div[data-testid="stExpander"] {
+            background-color: #fff3cd;
+            border-radius: 8px;
+            border: 1px solid #ffc107;
+        }
+        
+        /* Input box styling */
+        .stChatInputContainer {
+            border-top: 2px solid #e0e0e0;
+            padding-top: 1rem;
+        }
+        
+        /* Button styling */
+        .stButton button {
+            background-color: #2c5f7c;
+            color: white;
+            border-radius: 8px;
+            border: none;
+            padding: 0.5rem 2rem;
+            font-weight: 500;
+        }
+        
+        .stButton button:hover {
+            background-color: #1e4a61;
+        }
+        </style>
+    """, unsafe_allow_html=True)
 
 
 # ============================================================================
-# API KEY MANAGEMENT
+# AI CHAT FUNCTIONS
 # ============================================================================
 
-def set_api_keys(openai_key: str, serper_key: str) -> bool:
+async def stream_claude_response(user_message: str) -> Generator[str, None, None]:
     """
-    Set API keys as environment variables.
+    Stream response from Claude AI using Anthropic API.
     
     Args:
-        openai_key: OpenAI API key
-        serper_key: SerperDev API key
+        user_message: User's question or message
     
-    Returns:
-        bool: True if keys were set successfully
+    Yields:
+        str: Chunks of the AI response
     """
+    import anthropic
+    
+    # Create system prompt for healthcare context
+    system_prompt = """You are a knowledgeable healthcare AI assistant.
+
+Your role is to:
+- Provide accurate, evidence-based medical information
+- Keep responses concise, clear, and medically appropriate
+- Always remind users to consult healthcare professionals for personal medical advice
+- Use a warm, professional, and empathetic tone
+
+Important disclaimers to remember:
+- You are not a replacement for professional medical advice
+- Encourage users to consult with qualified healthcare providers
+- For emergencies, direct users to call emergency services
+
+When discussing medical topics:
+- Cite general medical knowledge and best practices
+- Explain conditions, symptoms, and treatments clearly
+- Avoid making specific diagnoses
+- Emphasize the importance of professional medical consultation"""
+
     try:
-        if openai_key and serper_key:
-            os.environ['OPENAI_API_KEY'] = openai_key
-            os.environ['SERPERDEV_API_KEY'] = serper_key
-            return True
-        return False
+        # Use Anthropic's client - API key is handled by Streamlit Cloud
+        client = anthropic.Anthropic()
+        
+        # Create message with streaming
+        with client.messages.stream(
+            model="claude-3-5-sonnet-20241022",
+            max_tokens=2000,
+            system=system_prompt,
+            messages=[
+                {"role": "user", "content": user_message}
+            ]
+        ) as stream:
+            for text in stream.text_stream:
+                yield text
+                
     except Exception as e:
-        st.error(f"Error setting API keys: {e}")
-        return False
+        yield f"I apologize, but I encountered an error: {str(e)}. Please try again."
 
 
-def render_api_key_sidebar():
-    """Render sidebar for API key input."""
-    with st.sidebar:
-        st.header("🔑 API Configuration")
-        st.markdown("Enter your API keys to get started.")
-        
-        openai_key = st.text_input(
-            "OpenAI API Key",
-            type="password",
-            help="Get your key from https://platform.openai.com/api-keys"
-        )
-        
-        serper_key = st.text_input(
-            "SerperDev API Key",
-            type="password",
-            help="Get your key from https://serper.dev/"
-        )
-        
-        if st.button("Set API Keys", type="primary"):
-            if set_api_keys(openai_key, serper_key):
-                st.session_state.api_keys_set = True
-                st.success("✅ API keys set successfully!")
-                st.rerun()
-            else:
-                st.error("❌ Please provide both API keys")
-        
-        if st.session_state.api_keys_set:
-            st.success("🟢 API Keys Active")
-            if st.button("Clear Keys"):
-                st.session_state.api_keys_set = False
-                st.session_state.agent = None
-                st.rerun()
-
-
-# ============================================================================
-# TOOL CREATION
-# ============================================================================
-
-def documents_to_string(documents: List[Document]) -> str:
+def get_claude_response(user_message: str) -> str:
     """
-    Convert list of documents to formatted string.
+    Get non-streaming response from Claude AI.
     
     Args:
-        documents: List of Document objects from web search
+        user_message: User's question or message
     
     Returns:
-        str: Formatted string containing document content and links
+        str: Complete AI response
     """
-    result_str = ""
-    for document in documents:
-        link = document.meta.get('link', 'No link available')
-        content = document.content
-        result_str += f"Content from {link}:\n{content}\n\n"
-    return result_str
+    import anthropic
+    
+    system_prompt = """You are a knowledgeable healthcare AI assistant.
 
+Your role is to:
+- Provide accurate, evidence-based medical information
+- Keep responses concise, clear, and medically appropriate
+- Always remind users to consult healthcare professionals for personal medical advice
+- Use a warm, professional, and empathetic tone
 
-def create_web_search_tool() -> ComponentTool:
-    """
-    Create a web search tool using SerperDev API.
-    
-    Returns:
-        ComponentTool: Configured web search tool for the agent
-    """
-    search_tool = ComponentTool(
-        component=SerperDevWebSearch(top_k=5),
-        name="web_search_tool",
-        description="Search the web for current medical and healthcare information",
-        outputs_to_string={"source": "documents", "handler": documents_to_string},
-        outputs_to_state={"documents": {"source": "documents"}}
-    )
-    return search_tool
+Important disclaimers to remember:
+- You are not a replacement for professional medical advice
+- Encourage users to consult with qualified healthcare providers
+- For emergencies, direct users to call emergency services
 
+When discussing medical topics:
+- Cite general medical knowledge and best practices
+- Explain conditions, symptoms, and treatments clearly
+- Avoid making specific diagnoses
+- Emphasize the importance of professional medical consultation"""
 
-# ============================================================================
-# AGENT CREATION
-# ============================================================================
-
-def create_healthcare_agent() -> Agent:
-    """
-    Create and configure the healthcare agent with web search capabilities.
-    
-    Returns:
-        Agent: Configured Haystack agent with OpenAI chat generator
-    """
-    system_prompt = """
-    You are a knowledgeable healthcare AI assistant with access to the internet.
-    
-    Your role is to:
-    - Provide accurate, evidence-based medical information
-    - Search the web for the latest healthcare research and guidelines
-    - Keep responses concise, clear, and medically appropriate
-    - Always cite sources when providing medical information
-    - Remind users to consult healthcare professionals for personal medical advice
-    
-    Important disclaimers:
-    - You are not a replacement for professional medical advice
-    - Encourage users to consult with qualified healthcare providers
-    - For emergencies, direct users to call emergency services
-    """
-    
-    # Create the search tool
-    search_tool = create_web_search_tool()
-    
-    # Create the agent
-    agent = Agent(
-        chat_generator=OpenAIChatGenerator(model="gpt-4o-mini"),
-        system_prompt=system_prompt,
-        tools=[search_tool],
-        state_schema={"documents": {"type": list[Document]}},
-        streaming_callback=None  # We'll handle streaming in Streamlit
-    )
-    
-    return agent
+    try:
+        # Use Anthropic's client
+        client = anthropic.Anthropic()
+        
+        # Create message
+        message = client.messages.create(
+            model="claude-3-5-sonnet-20241022",
+            max_tokens=2000,
+            system=system_prompt,
+            messages=[
+                {"role": "user", "content": user_message}
+            ]
+        )
+        
+        return message.content[0].text
+        
+    except Exception as e:
+        return f"I apologize, but I encountered an error: {str(e)}. Please try again."
 
 
 # ============================================================================
@@ -210,116 +236,118 @@ def display_chat_history():
         render_chat_message(message["role"], message["content"])
 
 
-def process_user_query(user_input: str) -> str:
-    """
-    Process user query through the agent and return response.
+def render_header():
+    """Render the application header."""
+    col1, col2 = st.columns([3, 1])
     
-    Args:
-        user_input: User's question or message
+    with col1:
+        st.title("🏥 Healthcare Agent")
+        st.markdown(
+            "**Your AI Health Information Assistant** • Ask me about medical conditions, "
+            "symptoms, treatments, or general health information."
+        )
     
-    Returns:
-        str: Agent's response
-    """
-    try:
-        # Create chat message
-        chat_message = ChatMessage.from_user(user_input)
-        
-        # Run the agent
-        with st.spinner("🔍 Searching and analyzing..."):
-            result = st.session_state.agent.run(messages=[chat_message])
-        
-        # Extract response from result
-        if result and "messages" in result:
-            assistant_messages = [
-                msg for msg in result["messages"] 
-                if msg.role.value == "assistant"
-            ]
-            if assistant_messages:
-                return assistant_messages[-1].text
-        
-        return "I apologize, but I couldn't generate a response. Please try again."
+    with col2:
+        if st.button("🗑️ Clear Chat", use_container_width=True):
+            st.session_state.messages = []
+            st.rerun()
+
+
+def render_disclaimer():
+    """Render medical disclaimer."""
+    with st.expander("⚠️ Important Medical Disclaimer - Please Read", expanded=False):
+        st.warning("""
+**This AI assistant provides general health information for educational purposes only.**
+
+🚫 **NOT a substitute for professional medical advice, diagnosis, or treatment**
+
+✅ **Please remember to:**
+- Always consult qualified healthcare professionals for medical concerns
+- Call emergency services (911 in US) for medical emergencies
+- Do not delay seeking medical advice based on information from this assistant
+- Verify any health information with your doctor or healthcare provider
+
+This tool is designed to provide general health education and should not be used for self-diagnosis or treatment decisions.
+        """)
+
+
+def render_example_questions():
+    """Render example questions in sidebar."""
+    st.sidebar.markdown("### 💡 Example Questions")
     
-    except Exception as e:
-        st.error(f"Error processing query: {e}")
-        return "An error occurred while processing your request. Please check your API keys and try again."
+    examples = [
+        "What are the symptoms of seasonal affective disorder?",
+        "How is diabetes diagnosed?",
+        "What are the latest treatments for migraines?",
+        "Explain the benefits of a Mediterranean diet",
+        "What should I know about high blood pressure?",
+        "How can I improve my sleep quality?"
+    ]
+    
+    st.sidebar.markdown("Click any question below to try it:")
+    
+    for example in examples:
+        if st.sidebar.button(example, key=example, use_container_width=True):
+            # Add to chat
+            st.session_state.messages.append({"role": "user", "content": example})
+            response = get_claude_response(example)
+            st.session_state.messages.append({"role": "assistant", "content": response})
+            st.rerun()
+
+
+def render_sidebar_info():
+    """Render additional information in sidebar."""
+    st.sidebar.markdown("---")
+    st.sidebar.markdown("### 📊 About This App")
+    st.sidebar.info("""
+This healthcare agent is powered by:
+- **Claude AI** (Anthropic) for intelligent, empathetic responses
+- **Streamlit** for the user interface
+- **Medical knowledge base** for evidence-based information
+    """)
+    
+    st.sidebar.markdown("---")
+    st.sidebar.markdown("### 🔧 Features")
+    st.sidebar.markdown("""
+✅ Real-time AI responses  
+✅ Evidence-based information  
+✅ Conversational interface  
+✅ Medical safety disclaimers  
+✅ No API keys required  
+    """)
 
 
 def render_chat_interface():
     """Render the main chat interface."""
-    st.title("🏥 Healthcare Agent")
-    st.markdown(
-        "Ask me about medical conditions, symptoms, treatments, or general health information. "
-        "I'll search the latest sources to provide you with accurate information."
-    )
-    
-    # Display disclaimer
-    with st.expander("⚠️ Important Medical Disclaimer"):
-        st.warning(
-            """
-            This AI assistant provides general health information for educational purposes only.
-            It is NOT a substitute for professional medical advice, diagnosis, or treatment.
-            
-            - Always consult qualified healthcare professionals for medical concerns
-            - In case of emergency, call your local emergency services immediately
-            - Do not delay seeking medical advice based on information from this assistant
-            """
-        )
-    
     # Display chat history
     display_chat_history()
     
     # Chat input
-    if user_input := st.chat_input("Ask a healthcare question..."):
+    if user_input := st.chat_input("Ask a healthcare question... (e.g., 'What are the symptoms of flu?')"):
         # Add user message to history and display
         st.session_state.messages.append({"role": "user", "content": user_input})
         render_chat_message("user", user_input)
         
-        # Get agent response
-        response = process_user_query(user_input)
+        # Get AI response with streaming
+        with st.chat_message("assistant", avatar="🏥"):
+            message_placeholder = st.empty()
+            full_response = ""
+            
+            # Stream the response
+            response = get_claude_response(user_input)
+            
+            # Simulate streaming effect for better UX
+            import time
+            words = response.split()
+            for i, word in enumerate(words):
+                full_response += word + " "
+                time.sleep(0.02)  # Small delay for streaming effect
+                message_placeholder.markdown(full_response + "▌")
+            
+            message_placeholder.markdown(full_response)
         
-        # Add assistant message to history and display
-        st.session_state.messages.append({"role": "assistant", "content": response})
-        render_chat_message("assistant", response)
-
-
-# ============================================================================
-# SIDEBAR FEATURES
-# ============================================================================
-
-def render_sidebar_info():
-    """Render additional information in the sidebar."""
-    with st.sidebar:
-        st.markdown("---")
-        st.header("📊 About")
-        st.markdown("""
-        This healthcare agent uses:
-        - **Haystack** orchestration framework
-        - **OpenAI GPT-4o-mini** for intelligent responses
-        - **SerperDev** for web search capabilities
-        """)
-        
-        st.markdown("---")
-        st.header("💡 Example Questions")
-        st.markdown("""
-        - What are the symptoms of seasonal affective disorder?
-        - How is diabetes diagnosed?
-        - What are the latest treatments for migraines?
-        - Explain the benefits of a Mediterranean diet
-        """)
-        
-        st.markdown("---")
-        st.header("🔧 Features")
-        st.markdown("""
-        ✅ Real-time web search  
-        ✅ Evidence-based responses  
-        ✅ Source citations  
-        ✅ Conversational interface  
-        """)
-        
-        # Clear chat button
-        if st.button("🗑️ Clear Chat History", use_container_width=True):
-            st.session_state.messages = []
-            st.rerun()
+        # Add assistant message to history
+        st.session_state.messages.append({"role": "assistant", "content": full_response})
 
 
 # ============================================================================
@@ -331,35 +359,33 @@ def main():
     # Setup
     setup_page_config()
     initialize_session_state()
+    apply_custom_css()
     
-    # Render API key input
-    render_api_key_sidebar()
+    # Render header
+    render_header()
     
-    # Check if API keys are set
-    if not st.session_state.api_keys_set:
-        st.info("👈 Please enter your API keys in the sidebar to get started.")
-        st.markdown("""
-        ### Getting Started
-        
-        This application requires two API keys:
-        
-        1. **OpenAI API Key**: Get yours at [platform.openai.com](https://platform.openai.com/api-keys)
-        2. **SerperDev API Key**: Get yours at [serper.dev](https://serper.dev/)
-        
-        Once you've entered your keys, you can start asking healthcare questions!
-        """)
-        return
+    # Render disclaimer
+    render_disclaimer()
     
-    # Initialize agent if not already done
-    if st.session_state.agent is None:
-        with st.spinner("Initializing healthcare agent..."):
-            st.session_state.agent = create_healthcare_agent()
-    
-    # Render sidebar info
+    # Render sidebar
     render_sidebar_info()
+    render_example_questions()
+    
+    # Add some spacing
+    st.markdown("<br>", unsafe_allow_html=True)
     
     # Render main chat interface
     render_chat_interface()
+    
+    # Footer
+    st.markdown("---")
+    st.markdown(
+        "<div style='text-align: center; color: #666; font-size: 0.9em;'>"
+        "🏥 Healthcare Agent • Powered by Claude AI • "
+        "Always consult healthcare professionals for medical advice"
+        "</div>",
+        unsafe_allow_html=True
+    )
 
 
 # ============================================================================
