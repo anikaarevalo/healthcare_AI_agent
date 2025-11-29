@@ -4,6 +4,8 @@ Capable of navigating the the web in real time, I constructed a healthcare AI ag
 
 My goal in this project is to prototype my own **tool-using AI agent** that is capable of interpreting natural language queries, make autonomous (accurate and appropriate) decisions, and act on them using the right tools at the right time.
 
+For this project, the use of OpenAI API and SerperDev API keys are necessary. This allows the AI agent access to gpt-4o-mini (a cost-effective OpenAI model) and source/retrieve data online. 
+
 This app is a **minimum viable product (MVP)** reflecting key agentic design principles and integration of components (Agent, Chat Generator, and Tool class) into an intelligent system as reusable pipelines.
 
 ---
@@ -12,7 +14,7 @@ This app is a **minimum viable product (MVP)** reflecting key agentic design pri
 
 OpenAI’s [ChatGPT-5](https://chatgpt.com/) transformed my source code into a production-ready Streamlit application to be deployed on [Streamlit cloud](https://share.streamlit.io/).
 
-Here are the key transformations implemented:
+Here are the key transformations I requested and were implemented:
 
 ### 1. Modular Structure
 * Organized code into clear sections: Configuration, API Management, Tool Creation, Agent Creation, Chat Interface, Main Application, and also a Sidebar
@@ -54,11 +56,12 @@ Here are the key transformations implemented:
 
 ## Future Plans
 
-To make my app production-grade, testing is required across multiple dimensions: validating user interactions, performing unit tests and qualitative evaluations, and ensuring guardrails and observability.
+To make the app production-grade, testing is required across multiple dimensions: validating user interactions, performing unit tests and qualitative evaluations, and ensuring guardrails and observability.
 
-1.  Upgrading the main functionality of fetching and generating a response from the web with the following features:
+1.  Upgrading the agent's main functionality of fetching data (source to date is web based) and generating a response with the following features:
     * Persistent chat history across sessions
     * Conversation export
-    * Real OpenAI token with streaming callbacks
+    * Real streaming callbacks
 2.  Building more reusable **Haystack pipelines** by implementing a second, complementary core functionality: querying structured personal (patient) data from a private database.
-3.  Enabling access to project functionality via MCP tooling (i.e., serving as MCP tool to MCP servers). 
+3.  Enabling access to project functionality via MCP tooling (i.e., serving as MCP tool to MCP clients).
+4.  Developing own machine learning model (instead of relying on commercially-available gen AI models) for the AI healthcare agent to interface with. 
