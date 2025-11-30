@@ -1,3 +1,5 @@
+# Healthcare AI Agent with Haystack
+
 ## About the Healthcare AI Agent
 
 Capable of navigating the the web in real time, I constructed a healthcare AI agent using [Haystack](https://haystack.deepset.ai/)--an open-source (modular, model-agnostic) orchestration framework for LLM-based applications. This project is inspired by DataCamp’s ["Building AI Agents with Haystack"](https://app.datacamp.com/learn/courses/building-ai-agents-with-haystack) interactive course.
