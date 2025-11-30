@@ -12,7 +12,7 @@ This app is a **minimum viable product (MVP)** reflecting key agentic design pri
 
 ## App Deployment via Streamlit
 
-OpenAI’s [ChatGPT-5](https://chatgpt.com/) transformed my source code into a production-ready Streamlit application to be deployed on [Streamlit cloud](https://share.streamlit.io/).
+OpenAI’s [ChatGPT-5](https://chatgpt.com/) transformed my source code ("haystack_ai_agent.py") into a production-ready Streamlit application. It is deployed on [Streamlit cloud](https://share.streamlit.io/).
 
 Here are the key transformations I requested and were implemented:
 
