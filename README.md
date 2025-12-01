@@ -58,7 +58,9 @@ Here are the key transformations I requested and were implemented:
 
 ## Future Plans
 
-To make the app production-grade, testing is required across multiple dimensions: validating user interactions, performing unit tests and qualitative evaluations, and ensuring guardrails and observability.
+To make the app production-grade, testing is required across multiple dimensions: validating user interactions, performing unit tests and qualitative evaluations, and ensuring guardrails and observability. 
+
+For the "nice-to-haves" of the Healthcare AI agent, here are some that come to mind:
 
 1.  Upgrading the agent's main functionality of fetching data (source to date is web based) and generating a response with the following features:
     * Persistent chat history across sessions
