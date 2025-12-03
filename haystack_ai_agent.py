@@ -541,3 +541,13 @@ if __name__ == "__main__":
     # example_basic_usage()
     # example_custom_prompt()
     # example_document_analysis()
+
+# ============================================================================
+# EXAMPLE USAGE
+# ============================================================================
+# Simple usage
+#openai_key, serper_key = initialize_api_keys()
+#agent = configure_healthcare_agent()
+#results = run_agent_query(agent, "Your question here")
+#response = extract_agent_response(results)
+#docs = inspect_saved_documents(results)
