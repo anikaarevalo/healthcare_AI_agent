@@ -6,7 +6,7 @@ Capable of navigating the the web in real time, I constructed a healthcare AI ag
 
 My goal in this project is to prototype my own **tool-using AI agent** that is capable of interpreting natural language queries, make autonomous (accurate and appropriate) decisions, and act on them using the right tools at the right time.
 
-For this project, the use of OpenAI API and SerperDev API keys are necessary. This allows the AI agent access to gpt-4o-mini (a cost-effective OpenAI model) and source/retrieve data online. 
+For this project, the use of OpenAI API and SerperDev API keys is necessary. This allows the AI agent access to gpt-4o-mini (a cost-effective OpenAI model) and source/retrieve data online. 
 
 This app is a **minimum viable product (MVP)** reflecting key agentic design principles and integration of components (Agent, Chat Generator, and Tool class) into an intelligent system as reusable pipelines.
 
